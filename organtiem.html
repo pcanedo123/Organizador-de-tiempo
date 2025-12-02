@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Despliegue Modelo – Cumplimiento de Metas</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --bg:#f5f7fb;
+      --card:#ffffff;
+      --primary:#1f4f7f;
+      --accent:#2ecc71;
+      --danger:#e74c3c;
+      --border:#dde2ec;
+      --radius:12px;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+      background: var(--bg);
+      color: #222;
+    }
+    .container {
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 0 16px;
+    }
+    h1 {
+      margin: 0 0 4px;
+      color: var(--primary);
+      font-size: 24px;
+    }
+    p.sub {
+      margin: 0 0 24px;
+      color: #555;
+      font-size: 14px;
+    }
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: 0 8px 18px rgba(0,0,0,.06);
+      border: 1px solid var(--border);
+    }
+    form {
+      display: grid;
+      grid-template-columns: repeat(auto-fit,minmax(220px,1fr));
+      gap: 16px 20px;
+    }
+    label {
+      display: flex;
+      flex-direction: column;
+      font-size: 13px;
+      color: #333;
+    }
+    label span {
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+    input, select, textarea {
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      font: inherit;
+      background: #fff;
+    }
+    textarea { min-height: 60px; resize: vertical; grid-column: 1 / -1; }
+
+    .actions {
+      margin-top: 16px;
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 10px 18px;
+      font-weight: 600;
+      cursor: pointer;
+      font: inherit;
+      background: var(--primary);
+      color: #fff;
+    }
+    button:disabled {
+      opacity: .6;
+      cursor: wait;
+    }
+    .status {
+      font-size: 13px;
+      color: #666;
+    }
+    .result {
+      margin-top: 20px;
+      padding: 14px 16px;
+      border-radius: var(--radius);
+      font-weight: 600;
+      display: none;
+    }
+    .result.ok {
+      background: rgba(46,204,113,.09);
+      border: 1px solid var(--accent);
+      color: #145b34;
+    }
+    .result.bad {
+      background: rgba(231,76,60,.09);
+      border: 1px solid var(--danger);
+      color: #7a2117;
+    }
+    .error {
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--danger);
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Predicción de Cumplimiento de Meta</h1>
+    <p class="sub">
+      Ingrese los datos de la actividad para que el modelo de <b>Clasificador de Bosque Aleatorio</b>
+      estime si se cumple la meta.
+    </p>
+
+    <div class="card">
+      <form id="form-prediccion">
+        <label>
+          <span>Fecha</span>
+          <input type="date" id="fecha" required>
+        </label>
+
+        <label>
+          <span>Meta</span>
+          <input type="text" id="meta" placeholder="Ej. Estudiar 2 horas de IA" required>
+        </label>
+
+        <label>
+          <span>Actividad realizada</span>
+          <input type="text" id="actividad" placeholder="Ej. Resolver ejercicios de Python" required>
+        </label>
+
+        <label>
+          <span>Nivel de Energía</span>
+          <select id="nivel_energia" required>
+            <option value="">Seleccione…</option>
+            <option value="1">1 – Muy baja</option>
+            <option value="2">2 – Baja</option>
+            <option value="3">3 – Media</option>
+            <option value="4">4 – Alta</option>
+            <option value="5">5 – Muy alta</option>
+          </select>
+        </label>
+
+        <label>
+          <span>Momento del día</span>
+          <select id="momento_dia" required>
+            <option value="">Seleccione…</option>
+            <option value="mañana">Mañana</option>
+            <option value="tarde">Tarde</option>
+            <option value="noche">Noche</option>
+          </select>
+        </label>
+
+        <label>
+          <span>Hora inicio</span>
+          <input type="time" id="hora_inicio" required>
+        </label>
+
+        <label>
+          <span>Hora fin</span>
+          <input type="time" id="hora_fin" required>
+        </label>
+
+        <label>
+          <span>Total horas</span>
+          <input type="number" step="0.25" min="0" id="total_horas" placeholder="Ej. 1.5" required>
+        </label>
+
+        <textarea id="notas" placeholder="Notas adicionales (opcional)…"></textarea>
+
+        <div class="actions">
+          <button type="submit" id="btn-enviar">Obtener predicción</button>
+          <div class="status" id="status"></div>
+        </div>
+      </form>
+
+      <div id="resultado" class="result"></div>
+      <div id="error" class="error"></div>
+    </div>
+  </div>
+
+  <script>
+    const form   = document.getElementById('form-prediccion');
+    const btn    = document.getElementById('btn-enviar');
+    const status = document.getElementById('status');
+    const divRes = document.getElementById('resultado');
+    const divErr = document.getElementById('error');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      divRes.style.display = 'none';
+      divErr.style.display = 'none';
+      status.textContent = 'Enviando datos al modelo…';
+      btn.disabled = true;
+
+      // Construir el payload tal como lo espera su API
+      const payload = {
+        fecha: document.getElementById('fecha').value,
+        meta: document.getElementById('meta').value,
+        actividad_realizada: document.getElementById('actividad').value,
+        nivel_energia: Number(document.getElementById('nivel_energia').value),
+        momento_dia: document.getElementById('momento_dia').value,
+        hora_inicio: document.getElementById('hora_inicio').value,
+        hora_fin: document.getElementById('hora_fin').value,
+        total_horas: Number(document.getElementById('total_horas').value),
+        // campo opcional, por si decide usarlo más adelante
+        notas: document.getElementById('notas').value || null
+      };
+
+      try {
+        // Cambie la URL por la de su backend en producción
+        const resp = await fetch('https://SU_API_DE_PRODUCCION/predict', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!resp.ok) {
+          throw new Error('Error HTTP ' + resp.status);
+        }
+
+        const data = await resp.json();
+        // Se asume que su API devuelve { "prediction": 0 } o 1
+        const cumple = data.prediction === 1 || data.prediction === 'SI';
+
+        divRes.textContent = cumple
+          ? 'Predicción del modelo: CUMPLE la meta.'
+          : 'Predicción del modelo: NO CUMPLE la meta.';
+
+        divRes.className = 'result ' + (cumple ? 'ok' : 'bad');
+        divRes.style.display = 'block';
+        status.textContent = 'Predicción recibida correctamente.';
+      } catch (err) {
+        console.error(err);
+        divErr.textContent = 'No fue posible obtener la predicción. Verifique la API o inténtelo más tarde.';
+        divErr.style.display = 'block';
+        status.textContent = '';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+  const XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
+
+// NOTE: you must manually enter your API_KEY below using information retrieved from your IBM Cloud account (https://dataplatform.cloud.ibm.com/docs/content/wsj/analyze-data/ml-authentication.html?context=cpdaas)
+const API_KEY = "<kkvKPlwCHHFDm1zD7O_unTRXUVLuSkidDlC8jXSqHVib>";
+
+const req = new XMLHttpRequest();
+const oReq = new XMLHttpRequest();
+
+function getToken(errorCallback, loadCallback) {
+	req.addEventListener("load", loadCallback);
+	req.addEventListener("error", errorCallback);
+	req.open("POST", "https://iam.cloud.ibm.com/identity/token");
+	req.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+	req.setRequestHeader("Accept", "application/json");
+	req.send("grant_type=urn:ibm:params:oauth:grant-type:apikey&apikey=" + API_KEY);
+}
+
+function apiPost(scoring_url, token, payload, loadCallback, errorCallback) {
+	oReq.addEventListener("load", loadCallback);
+	oReq.addEventListener("error", errorCallback);
+	oReq.open("POST", scoring_url);
+	oReq.setRequestHeader("Accept", "application/json");
+	oReq.setRequestHeader("Authorization", "Bearer " + token);
+	oReq.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+	oReq.send(payload);
+}
+
+getToken((err) => console.log("An error occurred submitting the request."), () => {
+	let tokenResponse;
+	try {
+		tokenResponse = JSON.parse(req.responseText);
+	} catch(ex) {
+		console.log("An error occurred parsing the token response.");
+		return;
+	}
+	// NOTE:  manually define and pass the array(s) of values to be scored in the next line
+	const payload = `{"input_data": [
+		{
+			"fields": [array_of_input_fields],
+			"values": [array_of_values_to_be_scored, another_array_of_values_to_be_scored]
+		}
+	]}`;
+
+	const scoring_url = "https://private.us-south.ml.cloud.ibm.com/ml/v4/deployments/orgtiempopd/predictions?version=2021-05-01";
+	apiPost(scoring_url, tokenResponse.access_token, payload, function (resp) {
+		let parsedPostResponse;
+		try {
+			parsedPostResponse = JSON.parse(oReq.responseText);
+		} catch (ex) {
+			console.log("An error occurred parsing the scoring response.");
+			return;
+		}
+		console.log("Scoring response");
+		console.log(JSON.stringify(parsedPostResponse, null, "  "));
+	}, function (error) {
+		console.log(error);
+	});
+});
+</body>
+</html>
